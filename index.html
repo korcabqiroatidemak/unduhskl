@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Daftar Nilai EBTAQ v2</title>
+    <title>Daftar Nilai EBTAQ v4</title>
     <style>
         /* Ukuran Kertas F4 (215mm x 330mm) */
         @page { size: 215mm 330mm; margin: 0; }
@@ -43,7 +43,7 @@
         th { background-color: #f2f2f2; font-weight: bold; }
         .text-left { text-align: left; padding-left: 8px; }
 
-        /* LOGIKA WARNA SESUAI INSTRUKSI */
+        /* LOGIKA WARNA */
         .red-text { color: red !important; font-weight: bold; }
         .red-row { background-color: #ffe6e6 !important; }
         .red-row td { color: red !important; border: 1px solid #ffcccc; }
@@ -58,7 +58,7 @@
 <body>
 
 <div class="control-panel">
-    <h3>PANEL KONTROL DAFTAR NILAI EBTAQ</h3>
+    <h3>PANEL KONTROL DAFTAR NILAI (v4)</h3>
     <div class="row">
         <div class="group">
             <label>1. Upload CSV Nilai</label>
@@ -88,8 +88,10 @@
     const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
+    // SET DEFAULT DATE SAAT LOAD
     window.onload = () => {
-        document.getElementById('report-date').valueAsDate = new Date();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('report-date').value = today;
     };
 
     function processCSV() {
@@ -97,7 +99,6 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             const lines = e.target.result.split(/\r?\n/).filter(l => l.trim() !== "");
-            // Headers diproses menjadi Uppercase untuk konsistensi pencarian
             const headers = lines[0].split(';').map(h => h.replace(/"/g, '').trim().toUpperCase());
             
             rawData = lines.slice(1).map(line => {
@@ -139,9 +140,10 @@
         const reportDate = getFormattedDate(document.getElementById('report-date').value);
         
         const area = document.getElementById('render-area');
+        
         area.innerHTML = `
             <div class="page-result">
-                <div class="header-title">TPQ ${sch}</div>
+                <div class="header-title">${sch}</div>
                 <div class="header-date">${reportDate}</div>
                 <table>
                     <thead>
@@ -166,7 +168,6 @@
 
         const body = document.getElementById('table-body');
         filtered.forEach((d, idx) => {
-            // Pengambilan status dari header "L / TL" sesuai instruksi
             const statusVal = d['L / TL'] || d['L/TL'] || "-";
             const isTL = statusVal === "TL";
             const rowClass = isTL ? 'class="red-row"' : '';
@@ -175,20 +176,16 @@
                 <td>${idx + 1}</td>
                 <td class="text-left">${formatTitleCase(d['NAMA LENGKAP'])}</td>`;
             
-            // Kolom nilai sesuai PDF 
             const scoreKeys = ['N. FSH', 'N. GRB', 'N. TRL', 'N. TJW', 'N. DDH', 'N. SSP', 'N. SLT', 'N. WDL'];
             
             scoreKeys.forEach(key => {
                 let displayVal = d[key] || "0";
-                // Konversi koma ke titik untuk pengecekan numerik
                 let num = parseFloat(displayVal.replace(',', '.'));
                 
-                // Merahkan teks jika nilai < 6 (angka 6 tetap hitam)
                 let cellClass = (num < 6) ? 'class="red-text"' : '';
                 rowHtml += `<td ${cellClass}>${displayVal}</td>`;
             });
 
-            // Kolom L/TL (Merah jika TL)
             const statusClass = isTL ? 'class="red-text"' : '';
             rowHtml += `<td ${statusClass}>${statusVal}</td></tr>`;
             
