@@ -2,50 +2,55 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Daftar Nilai EBTAQ</title>
+    <title>Daftar Nilai EBTAQ v2</title>
     <style>
-        @page { size: A4; margin: 1cm; }
-        body { font-family: Arial, sans-serif; background-color: #525659; margin: 0; padding: 0; }
+        /* Ukuran Kertas F4 (215mm x 330mm) */
+        @page { size: 215mm 330mm; margin: 0; }
+        body { 
+            margin: 0; padding: 0; background-color: #525659; 
+            font-family: "Times New Roman", serif; 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
 
         /* ================= PANEL KONTROL ================= */
         .control-panel {
-            background: #fff; width: 210mm; margin: 20px auto;
-            padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: #fff; width: 215mm; margin: 20px auto;
+            padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: block; box-sizing: border-box;
         }
+        .control-panel h3 { margin: 0 0 15px; color: #007bff; font-family: Arial; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .row { display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
         .group { flex: 1; display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 12px; font-weight: bold; color: #555; }
-        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        label { font-size: 11px; font-weight: bold; font-family: Arial; color: #555; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         
-        .btn-action { 
-            padding: 10px 20px; border: none; border-radius: 4px; 
-            cursor: pointer; font-weight: bold; color: #fff;
-        }
+        .btn-action { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; }
         .btn-gen { background: #28a745; }
         .btn-print { background: #007bff; display: none; }
 
-        /* ================= TEMPLATE NILAI ================= */
+        /* ================= TEMPLATE DAFTAR NILAI ================= */
         .page-result {
-            width: 210mm; min-height: 297mm; margin: 20px auto;
+            width: 215mm; min-height: 330mm; margin: 10mm auto;
             background-color: white; padding: 1.5cm; box-sizing: border-box;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            position: relative;
         }
-        .header-title { text-align: center; font-size: 16pt; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-        .header-date { text-align: center; font-size: 12pt; margin-bottom: 25px; }
+        .header-title { text-align: center; font-size: 16pt; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
+        .header-date { text-align: center; font-size: 12pt; margin-bottom: 20px; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid black; padding: 6px; font-size: 10pt; text-align: center; }
-        th { background-color: #f2f2f2; }
-        .text-left { text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .text-left { text-align: left; padding-left: 8px; }
 
-        /* LOGIKA WARNA */
-        .red-text { color: red; font-weight: bold; }
+        /* LOGIKA WARNA SESUAI INSTRUKSI */
+        .red-text { color: red !important; font-weight: bold; }
         .red-row { background-color: #ffe6e6 !important; }
-        .red-row td { color: red !important; }
+        .red-row td { color: red !important; border: 1px solid #ffcccc; }
 
         @media print {
-            body { background: none; }
-            .control-panel { display: none; }
+            body { background: none; padding: 0; }
+            .control-panel { display: none !important; }
             .page-result { margin: 0; box-shadow: none; width: 100%; }
         }
     </style>
@@ -53,7 +58,7 @@
 <body>
 
 <div class="control-panel">
-    <h3>PANEL KONTROL DAFTAR NILAI</h3>
+    <h3>PANEL KONTROL DAFTAR NILAI EBTAQ</h3>
     <div class="row">
         <div class="group">
             <label>1. Upload CSV Nilai</label>
@@ -61,7 +66,7 @@
         </div>
         <div class="group">
             <label>2. Pilih Lembaga</label>
-            <select id="sel-lembaga" disabled onchange="toggleBtn()">
+            <select id="sel-lembaga" disabled onchange="updateTitle()">
                 <option value="">-- Pilih Lembaga --</option>
             </select>
         </div>
@@ -71,7 +76,7 @@
         </div>
     </div>
     <div class="row">
-        <button class="btn-action btn-gen" onclick="generateTable()">Tampilkan Data</button>
+        <button class="btn-action btn-gen" onclick="generateTable()">Tampilkan Daftar Nilai</button>
         <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Unduh PDF / Cetak</button>
     </div>
 </div>
@@ -92,6 +97,7 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             const lines = e.target.result.split(/\r?\n/).filter(l => l.trim() !== "");
+            // Headers diproses menjadi Uppercase untuk konsistensi pencarian
             const headers = lines[0].split(';').map(h => h.replace(/"/g, '').trim().toUpperCase());
             
             rawData = lines.slice(1).map(line => {
@@ -110,21 +116,27 @@
         reader.readAsText(file);
     }
 
-    function toggleBtn() {
-        document.title = "Daftar Nilai - " + document.getElementById('sel-lembaga').value;
+    function updateTitle() {
+        const sch = document.getElementById('sel-lembaga').value;
+        document.title = "Daftar Nilai - " + sch;
     }
 
-    function formatDate(val) {
+    function formatTitleCase(str) {
+        if (!str) return "-";
+        return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    function getFormattedDate(val) {
         const d = new Date(val);
         return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     }
 
     function generateTable() {
         const sch = document.getElementById('sel-lembaga').value;
-        if(!sch) return alert("Pilih lembaga!");
+        if(!sch) return alert("Pilih lembaga terlebih dahulu!");
 
         const filtered = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
-        const reportDate = formatDate(document.getElementById('report-date').value);
+        const reportDate = getFormattedDate(document.getElementById('report-date').value);
         
         const area = document.getElementById('render-area');
         area.innerHTML = `
@@ -154,29 +166,31 @@
 
         const body = document.getElementById('table-body');
         filtered.forEach((d, idx) => {
-            const isTL = d['L/TL'] === "TL";
+            // Pengambilan status dari header "L / TL" sesuai instruksi
+            const statusVal = d['L / TL'] || d['L/TL'] || "-";
+            const isTL = statusVal === "TL";
             const rowClass = isTL ? 'class="red-row"' : '';
             
             let rowHtml = `<tr ${rowClass}>
                 <td>${idx + 1}</td>
-                <td class="text-left">${d['NAMA LENGKAP']}</td>`;
+                <td class="text-left">${formatTitleCase(d['NAMA LENGKAP'])}</td>`;
             
-            // Kolom nilai (N. FSH s.d N. WDL)
+            // Kolom nilai sesuai PDF 
             const scoreKeys = ['N. FSH', 'N. GRB', 'N. TRL', 'N. TJW', 'N. DDH', 'N. SSP', 'N. SLT', 'N. WDL'];
             
             scoreKeys.forEach(key => {
-                let val = d[key] ? d[key].replace(',', '.') : "0";
-                let num = parseFloat(val);
-                let displayVal = d[key] || "-";
+                let displayVal = d[key] || "0";
+                // Konversi koma ke titik untuk pengecekan numerik
+                let num = parseFloat(displayVal.replace(',', '.'));
                 
-                // Merahkan jika < 6 (6 tetap hitam)
+                // Merahkan teks jika nilai < 6 (angka 6 tetap hitam)
                 let cellClass = (num < 6) ? 'class="red-text"' : '';
                 rowHtml += `<td ${cellClass}>${displayVal}</td>`;
             });
 
-            // Kolom L/TL
+            // Kolom L/TL (Merah jika TL)
             const statusClass = isTL ? 'class="red-text"' : '';
-            rowHtml += `<td ${statusClass}>${d['L/TL'] || "-"}</td></tr>`;
+            rowHtml += `<td ${statusClass}>${statusVal}</td></tr>`;
             
             body.innerHTML += rowHtml;
         });
