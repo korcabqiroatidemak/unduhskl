@@ -2,10 +2,9 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Daftar Nilai EBTAQ v4</title>
+    <title>Sistem Nilai EBTAQ v5</title>
     <style>
-        /* Ukuran Kertas F4 (215mm x 330mm) */
-        @page { size: 215mm 330mm; margin: 0; }
+        @page { size: 215mm 330mm; margin: 1cm; }
         body { 
             margin: 0; padding: 0; background-color: #525659; 
             font-family: "Times New Roman", serif; 
@@ -17,36 +16,38 @@
         .control-panel {
             background: #fff; width: 215mm; margin: 20px auto;
             padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: block; box-sizing: border-box;
         }
-        .control-panel h3 { margin: 0 0 15px; color: #007bff; font-family: Arial; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .row { display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
         .group { flex: 1; display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 11px; font-weight: bold; font-family: Arial; color: #555; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-        
         .btn-action { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; }
         .btn-gen { background: #28a745; }
         .btn-print { background: #007bff; display: none; }
 
-        /* ================= TEMPLATE DAFTAR NILAI ================= */
+        /* ================= KANVAS LAPORAN ================= */
         .page-result {
             width: 215mm; min-height: 330mm; margin: 10mm auto;
             background-color: white; padding: 1.5cm; box-sizing: border-box;
-            position: relative;
         }
         .header-title { text-align: center; font-size: 16pt; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
         .header-date { text-align: center; font-size: 12pt; margin-bottom: 20px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid black; padding: 6px; font-size: 10pt; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid black; padding: 5px; font-size: 10pt; text-align: center; }
         th { background-color: #f2f2f2; font-weight: bold; }
         .text-left { text-align: left; padding-left: 8px; }
 
         /* LOGIKA WARNA */
         .red-text { color: red !important; font-weight: bold; }
         .red-row { background-color: #ffe6e6 !important; }
-        .red-row td { color: red !important; border: 1px solid #ffcccc; }
+        .red-row td { color: red !important; }
+
+        /* REKAP & JUARA SECTION */
+        .rekap-section { margin-top: 30px; display: flex; gap: 20px; flex-wrap: wrap; }
+        .box-info { flex: 1; min-width: 300px; border: 1px solid #000; padding: 10px; }
+        .box-title { font-weight: bold; border-bottom: 1px solid #000; margin-bottom: 10px; text-transform: uppercase; font-size: 11pt; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt; }
 
         @media print {
             body { background: none; padding: 0; }
@@ -58,7 +59,7 @@
 <body>
 
 <div class="control-panel">
-    <h3>PANEL KONTROL DAFTAR NILAI (v4)</h3>
+    <h3>PANEL KONTROL DAFTAR NILAI (v5)</h3>
     <div class="row">
         <div class="group">
             <label>1. Upload CSV Nilai</label>
@@ -76,8 +77,8 @@
         </div>
     </div>
     <div class="row">
-        <button class="btn-action btn-gen" onclick="generateTable()">Tampilkan Daftar Nilai</button>
-        <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Unduh PDF / Cetak</button>
+        <button class="btn-action btn-gen" onclick="generateTable()">Proses Data & Analisa</button>
+        <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Simpan Ke PDF</button>
     </div>
 </div>
 
@@ -85,13 +86,13 @@
 
 <script>
     let rawData = [];
+    let globalAvg = 0;
     const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const scoreKeys = ['N. FSH', 'N. TRL', 'N. TJW', 'N. GRB', 'N. DDH', 'N. SSP', 'N. SLT', 'N. WDL'];
 
-    // SET DEFAULT DATE SAAT LOAD
     window.onload = () => {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('report-date').value = today;
+        document.getElementById('report-date').value = new Date().toISOString().split('T')[0];
     };
 
     function processCSV() {
@@ -105,8 +106,24 @@
                 const cols = line.split(';').map(c => c.replace(/"/g, '').trim());
                 let obj = {};
                 cols.forEach((v, i) => { if(headers[i]) obj[headers[i]] = v; });
+                
+                // Hitung Rata-rata Akhir per siswa untuk keperluan sorting
+                let sum = 0;
+                scoreKeys.forEach(k => sum += parseFloat((obj[k]||"0").replace(',','.')) || 0);
+                obj._avg = sum / scoreKeys.length;
+                
+                // Hitung Rata-rata 4 Mapel Utama (FSH, TRL, TJW, GRB)
+                let sum4 = 0;
+                ['N. FSH', 'N. TRL', 'N. TJW', 'N. GRB'].forEach(k => sum4 += parseFloat((obj[k]||"0").replace(',','.')) || 0);
+                obj._avg4 = sum4 / 4;
+                obj._fsh = parseFloat((obj['N. FSH']||"0").replace(',','.'));
+
                 return obj;
             });
+
+            // Hitung Rata-rata Global (Semua Lembaga)
+            const validData = rawData.filter(d => d._avg > 0);
+            globalAvg = validData.reduce((a, b) => a + b._avg, 0) / validData.length;
 
             const schools = [...new Set(rawData.map(d => d['ASAL LEMBAGA']))].sort();
             const sel = document.getElementById('sel-lembaga');
@@ -117,82 +134,106 @@
         reader.readAsText(file);
     }
 
-    function updateTitle() {
-        const sch = document.getElementById('sel-lembaga').value;
-        document.title = "Daftar Nilai - " + sch;
-    }
-
     function formatTitleCase(str) {
-        if (!str) return "-";
-        return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    }
-
-    function getFormattedDate(val) {
-        const d = new Date(val);
-        return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : "-";
     }
 
     function generateTable() {
         const sch = document.getElementById('sel-lembaga').value;
-        if(!sch) return alert("Pilih lembaga terlebih dahulu!");
+        if(!sch) return alert("Pilih lembaga!");
 
-        const filtered = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
-        const reportDate = getFormattedDate(document.getElementById('report-date').value);
-        
-        const area = document.getElementById('render-area');
-        
-        area.innerHTML = `
+        const list = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
+        const reportDate = document.getElementById('report-date').value;
+        const dObj = new Date(reportDate);
+        const tglFull = `${days[dObj.getDay()]}, ${dObj.getDate()} ${months[dObj.getMonth()]} ${dObj.getFullYear()}`;
+
+        // ANALISA REKAPITULASI
+        const totalPeserta = list.length;
+        const lulus = list.filter(d => (d['L / TL'] || d['L/TL']) === "L").length;
+        const tLulus = totalPeserta - lulus;
+        const persenLulus = ((lulus/totalPeserta)*100).toFixed(1);
+        const avgLembaga = list.reduce((a,b) => a + b._avg, 0) / totalPeserta;
+
+        // ANALISA JUARA (HANYA L)
+        const candidates = list.filter(d => (d['L / TL'] || d['L/TL']) === "L")
+            .sort((a, b) => b._avg - a._avg || b._avg4 - a._avg4 || b._fsh - a._fsh);
+
+        let html = `
             <div class="page-result">
                 <div class="header-title">${sch}</div>
-                <div class="header-date">${reportDate}</div>
+                <div class="header-date">${tglFull}</div>
                 <table>
                     <thead>
                         <tr>
-                            <th>No.</th>
-                            <th>Nama Lengkap</th>
-                            <th>N. FSH</th>
-                            <th>N. GRB</th>
-                            <th>N. TRL</th>
-                            <th>N. TJW</th>
-                            <th>N. DDH</th>
-                            <th>N. SSP</th>
-                            <th>N. SLT</th>
-                            <th>N. WDL</th>
+                            <th>No.</th><th>Nama Lengkap</th>
+                            ${scoreKeys.map(k => `<th>${k}</th>`).join('')}
                             <th>L/TL</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body"></tbody>
+                    <tbody>
+                        ${list.map((d, i) => {
+                            const isTL = (d['L / TL'] || d['L/TL']) === "TL";
+                            return `<tr class="${isTL ? 'red-row' : ''}">
+                                <td>${i+1}</td>
+                                <td class="text-left">${formatTitleCase(d['NAMA LENGKAP'])}</td>
+                                ${scoreKeys.map(k => {
+                                    const val = parseFloat((d[k]||"0").replace(',','.'));
+                                    return `<td class="${val < 6 ? 'red-text' : ''}">${d[k]||'0'}</td>`;
+                                }).join('')}
+                                <td class="${isTL ? 'red-text' : ''}">${d['L / TL'] || d['L/TL'] || '-'}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
                 </table>
-            </div>
-        `;
 
-        const body = document.getElementById('table-body');
-        filtered.forEach((d, idx) => {
-            const statusVal = d['L / TL'] || d['L/TL'] || "-";
-            const isTL = statusVal === "TL";
-            const rowClass = isTL ? 'class="red-row"' : '';
-            
-            let rowHtml = `<tr ${rowClass}>
-                <td>${idx + 1}</td>
-                <td class="text-left">${formatTitleCase(d['NAMA LENGKAP'])}</td>`;
-            
-            const scoreKeys = ['N. FSH', 'N. GRB', 'N. TRL', 'N. TJW', 'N. DDH', 'N. SSP', 'N. SLT', 'N. WDL'];
-            
-            scoreKeys.forEach(key => {
-                let displayVal = d[key] || "0";
-                let num = parseFloat(displayVal.replace(',', '.'));
-                
-                let cellClass = (num < 6) ? 'class="red-text"' : '';
-                rowHtml += `<td ${cellClass}>${displayVal}</td>`;
-            });
+                <div class="rekap-section">
+                    <div class="box-info">
+                        <div class="box-title">Rekapitulasi Kelulusan</div>
+                        <div class="info-row"><span>Jumlah Peserta</span> <span>: ${totalPeserta}</span></div>
+                        <div class="info-row"><span>Lulus</span> <span>: ${lulus}</span></div>
+                        <div class="info-row"><span>Tidak Lulus</span> <span>: ${tLulus}</span></div>
+                        <div class="info-row"><span>Persentase</span> <span>: ${persenLulus}%</span></div>
+                        <div class="info-row" style="margin-top:10px; font-weight:bold; border-top:1px dashed #ccc;">
+                            <span>Rata-rata Lembaga</span> <span>: ${avgLembaga.toFixed(2)}</span>
+                        </div>
+                        <div class="info-row"><span>Rata-rata Global (CSV)</span> <span>: ${globalAvg.toFixed(2)}</span></div>
+                    </div>
 
-            const statusClass = isTL ? 'class="red-text"' : '';
-            rowHtml += `<td ${statusClass}>${statusVal}</td></tr>`;
-            
-            body.innerHTML += rowHtml;
-        });
+                    <div class="box-info">
+                        <div class="box-title">Prestasi Siswa (Juara)</div>
+                        ${candidates.length > 0 ? candidates.slice(0,3).map((c, i) => `
+                            <div class="info-row">
+                                <span>Juara ${['I','II','III'][i]} a.n. ${formatTitleCase(c['NAMA LENGKAP'])}</span>
+                                <span>Rata-rata: ${c._avg.toFixed(2)}</span>
+                            </div>
+                        `).join('') : '<div class="info-row">Tidak ada data juara (Tidak ada yang lulus)</div>'}
+                    </div>
 
+                    <div class="box-info" style="flex:2">
+                        <div class="box-title">Analisa Materi & Kualitas</div>
+                        <table>
+                            <thead><tr><th>Materi</th><th>Avg Lembaga</th><th>Status</th></tr></thead>
+                            <tbody>
+                                ${scoreKeys.map(k => {
+                                    const mAvg = list.reduce((a,b) => a + parseFloat((b[k]||"0").replace(',','.')), 0) / totalPeserta;
+                                    return `<tr>
+                                        <td>${k}</td>
+                                        <td class="${mAvg < 6 ? 'red-text' : ''}">${mAvg.toFixed(2)}</td>
+                                        <td>${mAvg < 6 ? 'PERLU REMIDIAL' : 'TUNTAS'}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        
+        document.getElementById('render-area').innerHTML = html;
         document.getElementById('print-btn').style.display = 'block';
+    }
+
+    function updateTitle() {
+        document.title = "Hasil EBTAQ - " + document.getElementById('sel-lembaga').value;
     }
 </script>
 </body>
