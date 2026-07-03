@@ -263,6 +263,28 @@
         document.title = "Hasil EBTAQ - " + document.getElementById('sel-lembaga').value;
     }
 
+    function formatTanggalIndo(tglStr) {
+        if (!tglStr || tglStr.trim() === '' || tglStr === '-') return '-';
+        let d = new Date(tglStr);
+        
+        // Jika pembacaan standar gagal (misal sistem mendeteksi DD/MM/YYYY dari AppSheet)
+        if (isNaN(d.getTime())) {
+            const parts = tglStr.split(/[-/]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    d = new Date(parts[0], parseInt(parts[1])-1, parts[2]); // Pola YYYY-MM-DD
+                } else {
+                    d = new Date(parts[2], parseInt(parts[1])-1, parts[0]); // Pola DD/MM/YYYY
+                }
+            }
+        }
+        
+        // Jika data benar-benar bukan tanggal valid, biarkan aslinya dengan format proper
+        if (isNaN(d.getTime())) return formatTitleCase(tglStr); 
+        
+        return `${d.getDate().toString().padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
     function unduhExcel(mode) {
         if (rawData.length === 0) return alert("Harap upload data CSV terlebih dahulu!");
 
@@ -276,12 +298,10 @@
             namaFile = `Data_Raport_Lembaga_${sch}.xlsx`;
         }
 
-        // PETA NAMA KOLOM TERBILANG DARI APPSHEET
-        // (Pastikan menggunakan huruf kapital karena header CSV otomatis di-uppercase oleh sistem)
         const mapTerbilang = {
             'N. FSH': 'RELATED FASHOHAHS',
             'N. TRL': 'RELATED TARTILS',
-            'N. TJW': 'RELATED TAJWIDS', // Saya asumsikan ini polanya, silakan sesuaikan jika beda
+            'N. TJW': 'RELATED TAJWIDS',
             'N. GRB': 'RELATED GHARIBS',
             'N. DDH': 'RELATED DDHS',
             'N. SSP': 'RELATED SSPS',
@@ -289,17 +309,18 @@
             'N. WDL': 'RELATED WUDHUS'
         };
 
-        // Menyusun ulang struktur data untuk Mail Merge MS Word
         const excelData = dataToExport.map((d, index) => {
+            // STRUKTUR KOLOM DIPERBARUI SESUAI PERMINTAAN
             let row = {
                 "Nomor": index + 1,
                 "Korcam": d['KORCAM'] || d['Korcam'] || "-", 
                 "Asal Lembaga": d['ASAL LEMBAGA'] || "-",
                 "ID": d['ID PESERTA'] || d['ID'] || "-",
-                "Nama": formatTitleCase(d['NAMA LENGKAP'] || d['NAMA'] || ""),
-                "TTL": `${d['TEMPAT LAHIR'] || '-'}, ${d['TANGGAL LAHIR'] || '-'}`,
-                "Ayah": d['BIN'] || "-",
-                "Ibu": d['BINTI'] || "-"
+                "Nama Lengkap": formatTitleCase(d['NAMA LENGKAP'] || d['NAMA'] || ""),
+                "Tempat Lahir": formatTitleCase(d['TEMPAT LAHIR'] || "-"), 
+                "Tanggal Lahir": formatTanggalIndo(d['TANGGAL LAHIR']), 
+                "Nama Ayah": formatTitleCase(d['BIN'] || d['NAMA AYAH'] || d['AYAH'] || "-"),
+                "Nama Ibu": formatTitleCase(d['BINTI'] || d['NAMA IBU'] || d['IBU'] || "-")
             };
 
             let total = 0;
@@ -309,32 +330,31 @@
                 let valAngka = parseFloat((d[k] || "0").replace(',', '.'));
                 let headerTerbilang = mapTerbilang[k];
                 
-                // Menyusun kolom: Nilai Angka disusul Nilai Terbilang langsung dari CSV
                 row[`${k} (Angka)`] = valAngka;
                 row[`${k} (Terbilang)`] = d[headerTerbilang] || "-"; 
                 
                 total += valAngka;
             });
 
-            // Kalkulasi Total dan Rata-rata di bagian paling belakang
+            // Total dan Rata-rata
             row["Total"] = total;
             row["Rata-rata"] = parseFloat((total / scoreKeys.length).toFixed(2));
             
             return row;
         });
 
-        // Proses pembuatan file .xlsx dengan SheetJS
+        // Generate Excel
         const worksheet = XLSX.utils.json_to_sheet(excelData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Data Raport");
         
-        // Sesuaikan lebar kolom agar rapi saat dibuka di Excel
+        // Mengatur lebar kolom (Disesuaikan agar kolom Nama Ayah/Ibu dan Tanggal lahir cukup luas)
         const wscols = [
-            {wch: 5}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 30}, {wch: 25}, {wch: 20}, {wch: 20}
+            {wch: 5}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 30}, 
+            {wch: 15}, {wch: 20}, {wch: 20}, {wch: 20} 
         ];
         worksheet['!cols'] = wscols;
 
-        // Picu unduhan
         XLSX.writeFile(workbook, namaFile);
     }
 </script>
