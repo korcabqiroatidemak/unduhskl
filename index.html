@@ -34,7 +34,7 @@
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
         .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #00acc1; } /* Warna aktif Cyan menyesuaikan tema UI Anda */
+        input:checked + .slider { background-color: #00acc1; }
         input:checked + .slider:before { transform: translateX(20px); }
 
         /* ================= KANVAS LAPORAN ================= */
@@ -73,7 +73,7 @@
 <body>
 
 <div class="control-panel">
-    <h3>PANEL KONTROL DAFTAR NILAI (v5.1)</h3>
+    <h3>PANEL KONTROL DAFTAR NILAI (v5.2)</h3>
     <div class="row">
         <div class="group">
             <label>1. Upload CSV Nilai</label>
@@ -164,7 +164,6 @@
         const sch = document.getElementById('sel-lembaga').value;
         if(!sch) return alert("Pilih lembaga!");
 
-        // CEK STATUS SWITCH BUTTON
         const showScores = document.getElementById('toggle-scores').checked;
 
         const list = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
@@ -232,6 +231,7 @@
                         `).join('') : '<div class="info-row">Tidak ada data juara (Tidak ada yang lulus)</div>'}
                     </div>
 
+                    ${showScores ? `
                     <div class="box-info" style="flex:2">
                         <div class="box-title">Analisa Materi & Kualitas</div>
                         <table>
@@ -239,15 +239,16 @@
                             <tbody>
                                 ${scoreKeys.map(k => {
                                     const mAvg = list.reduce((a,b) => a + parseFloat((b[k]||"0").replace(',','.')), 0) / totalPeserta;
-                                    return `<tr>
-                                        <td>${k}</td>
-                                        <td class="${mAvg < 6 ? 'red-text' : ''}">${mAvg.toFixed(2)}</td>
-                                        <td>${mAvg < 6 ? 'PERLU REMIDIAL' : 'TUNTAS'}</td>
-                                    </tr>`;
+                                    return '<tr>' +
+                                        '<td>' + k + '</td>' +
+                                        '<td class="' + (mAvg < 6 ? 'red-text' : '') + '">' + mAvg.toFixed(2) + '</td>' +
+                                        '<td>' + (mAvg < 6 ? 'PERLU REMIDIAL' : 'TUNTAS') + '</td>' +
+                                    '</tr>';
                                 }).join('')}
                             </tbody>
                         </table>
                     </div>
+                    ` : ''}
                 </div>
             </div>`;
         
