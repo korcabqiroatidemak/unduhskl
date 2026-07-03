@@ -18,12 +18,24 @@
             padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         .row { display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
+        .row-action { justify-content: space-between; align-items: center; display: flex; margin-top: 20px; }
         .group { flex: 1; display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 11px; font-weight: bold; font-family: Arial; color: #555; }
-        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        input[type="file"], input[type="date"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
         .btn-action { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; }
         .btn-gen { background: #28a745; }
         .btn-print { background: #007bff; display: none; }
+        .btn-group { display: flex; gap: 10px; }
+
+        /* ================= TOGGLE SWITCH BUTTON ================= */
+        .switch-wrapper { display: flex; items-center; gap: 10px; font-family: Arial, sans-serif; }
+        .switch-label { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #00acc1; } /* Warna aktif Cyan menyesuaikan tema UI Anda */
+        input:checked + .slider:before { transform: translateX(20px); }
 
         /* ================= KANVAS LAPORAN ================= */
         .page-result {
@@ -50,26 +62,18 @@
         .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt; }
 
         /* ================= SETTING KHUSUS CETAK ================= */
-@media print {
-    /* 1. KITA TETAPKAN MARGIN KERTAS FISIK DI SINI (Misal 1.5cm) */
-    @page { size: 215mm 330mm; 
-        margin: 1.5cm; /* Jarak aman dari tepi kertas untuk SEMUA halaman */
-    }
-
-    body { background: none; padding: 0; }
-
-    .control-panel { display: none !important; }
-
-    /* 2. KITA NOL-KAN PADDING AGAR TIDAK DOUBLE DENGAN MARGIN DI ATAS */
-    .page-result { 
-        width: 100%; margin: 0; padding: 0 !important; box-shadow: none; }
-}
+        @media print {
+            @page { size: 215mm 330mm; margin: 1.5cm; }
+            body { background: none; padding: 0; }
+            .control-panel { display: none !important; }
+            .page-result { width: 100%; margin: 0; padding: 0 !important; box-shadow: none; }
+        }
     </style>
 </head>
 <body>
 
 <div class="control-panel">
-    <h3>PANEL KONTROL DAFTAR NILAI (v5)</h3>
+    <h3>PANEL KONTROL DAFTAR NILAI (v5.1)</h3>
     <div class="row">
         <div class="group">
             <label>1. Upload CSV Nilai</label>
@@ -86,9 +90,20 @@
             <input type="date" id="report-date">
         </div>
     </div>
-    <div class="row">
-        <button class="btn-action btn-gen" onclick="generateTable()">Proses Data & Analisa</button>
-        <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Simpan Ke PDF</button>
+    
+    <div class="row-action">
+        <div class="btn-group">
+            <button class="btn-action btn-gen" onclick="generateTable()">Proses Data & Analisa</button>
+            <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Simpan Ke PDF</button>
+        </div>
+        
+        <div class="switch-wrapper">
+            <span class="switch-label">Tampilkan Detail Nilai</span>
+            <label class="switch">
+                <input type="checkbox" id="toggle-scores" onchange="if(document.getElementById('sel-lembaga').value) generateTable()">
+                <span class="slider"></span>
+            </label>
+        </div>
     </div>
 </div>
 
@@ -117,12 +132,10 @@
                 let obj = {};
                 cols.forEach((v, i) => { if(headers[i]) obj[headers[i]] = v; });
                 
-                // Hitung Rata-rata Akhir per siswa untuk keperluan sorting
                 let sum = 0;
                 scoreKeys.forEach(k => sum += parseFloat((obj[k]||"0").replace(',','.')) || 0);
                 obj._avg = sum / scoreKeys.length;
                 
-                // Hitung Rata-rata 4 Mapel Utama (FSH, TRL, TJW, GRB)
                 let sum4 = 0;
                 ['N. FSH', 'N. TRL', 'N. TJW', 'N. GRB'].forEach(k => sum4 += parseFloat((obj[k]||"0").replace(',','.')) || 0);
                 obj._avg4 = sum4 / 4;
@@ -131,7 +144,6 @@
                 return obj;
             });
 
-            // Hitung Rata-rata Global (Semua Lembaga)
             const validData = rawData.filter(d => d._avg > 0);
             globalAvg = validData.reduce((a, b) => a + b._avg, 0) / validData.length;
 
@@ -152,19 +164,20 @@
         const sch = document.getElementById('sel-lembaga').value;
         if(!sch) return alert("Pilih lembaga!");
 
+        // CEK STATUS SWITCH BUTTON
+        const showScores = document.getElementById('toggle-scores').checked;
+
         const list = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
         const reportDate = document.getElementById('report-date').value;
         const dObj = new Date(reportDate);
         const tglFull = `${days[dObj.getDay()]}, ${dObj.getDate()} ${months[dObj.getMonth()]} ${dObj.getFullYear()}`;
 
-        // ANALISA REKAPITULASI
         const totalPeserta = list.length;
         const lulus = list.filter(d => (d['L / TL'] || d['L/TL']) === "L").length;
         const tLulus = totalPeserta - lulus;
         const persenLulus = ((lulus/totalPeserta)*100).toFixed(1);
         const avgLembaga = list.reduce((a,b) => a + b._avg, 0) / totalPeserta;
 
-        // ANALISA JUARA (HANYA L)
         const candidates = list.filter(d => (d['L / TL'] || d['L/TL']) === "L")
             .sort((a, b) => b._avg - a._avg || b._avg4 - a._avg4 || b._fsh - a._fsh);
 
@@ -176,7 +189,7 @@
                     <thead>
                         <tr>
                             <th>No.</th><th>Nama Lengkap</th>
-                            ${scoreKeys.map(k => `<th>${k}</th>`).join('')}
+                            ${showScores ? scoreKeys.map(k => `<th>${k}</th>`).join('') : ''}
                             <th>L/TL</th>
                         </tr>
                     </thead>
@@ -186,10 +199,10 @@
                             return `<tr class="${isTL ? 'red-row' : ''}">
                                 <td>${i+1}</td>
                                 <td class="text-left">${formatTitleCase(d['NAMA LENGKAP'])}</td>
-                                ${scoreKeys.map(k => {
+                                ${showScores ? scoreKeys.map(k => {
                                     const val = parseFloat((d[k]||"0").replace(',','.'));
                                     return `<td class="${val < 6 ? 'red-text' : ''}">${d[k]||'0'}</td>`;
-                                }).join('')}
+                                }).join('') : ''}
                                 <td class="${isTL ? 'red-text' : ''}">${d['L / TL'] || d['L/TL'] || '-'}</td>
                             </tr>`;
                         }).join('')}
