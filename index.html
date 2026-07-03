@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>SKL EBTAQ</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
         @page { size: 215mm 330mm; margin: 1cm; }
         body { 
@@ -95,6 +96,8 @@
         <div class="btn-group">
             <button class="btn-action btn-gen" onclick="generateTable()">Proses Data & Analisa</button>
             <button id="print-btn" class="btn-action btn-print" onclick="window.print()">Simpan Ke PDF</button>
+            <button class="btn-action" style="background-color: #107c41;" onclick="unduhExcel('semua')">Unduh Excel (Utuh)</button>
+            <button class="btn-action" style="background-color: #1a9c53;" onclick="unduhExcel('lembaga')">Unduh Excel (Lembaga)</button>
         </div>
         
         <div class="switch-wrapper">
@@ -258,6 +261,81 @@
 
     function updateTitle() {
         document.title = "Hasil EBTAQ - " + document.getElementById('sel-lembaga').value;
+    }
+
+    function unduhExcel(mode) {
+        if (rawData.length === 0) return alert("Harap upload data CSV terlebih dahulu!");
+
+        let dataToExport = rawData;
+        let namaFile = "Data_Raport_Utuh.xlsx";
+
+        if (mode === 'lembaga') {
+            const sch = document.getElementById('sel-lembaga').value;
+            if (!sch) return alert("Pilih lembaga terlebih dahulu pada panel kontrol!");
+            dataToExport = rawData.filter(d => d['ASAL LEMBAGA'] === sch);
+            namaFile = `Data_Raport_Lembaga_${sch}.xlsx`;
+        }
+
+        // PETA NAMA KOLOM TERBILANG DARI APPSHEET
+        // (Pastikan menggunakan huruf kapital karena header CSV otomatis di-uppercase oleh sistem)
+        const mapTerbilang = {
+            'N. FSH': 'RELATED FASHOHAHS',
+            'N. TRL': 'RELATED TARTILS',
+            'N. TJW': 'RELATED TAJWIDS', // Saya asumsikan ini polanya, silakan sesuaikan jika beda
+            'N. GRB': 'RELATED GHARIBS',
+            'N. DDH': 'RELATED DDHS',
+            'N. SSP': 'RELATED SSPS',
+            'N. SLT': 'RELATED SHOLATS',
+            'N. WDL': 'RELATED WUDHUS'
+        };
+
+        // Menyusun ulang struktur data untuk Mail Merge MS Word
+        const excelData = dataToExport.map((d, index) => {
+            let row = {
+                "Nomor": index + 1,
+                "Korcam": d['KORCAM'] || d['Korcam'] || "-", 
+                "Asal Lembaga": d['ASAL LEMBAGA'] || "-",
+                "ID": d['ID PESERTA'] || d['ID'] || "-",
+                "Nama": formatTitleCase(d['NAMA LENGKAP'] || d['NAMA'] || ""),
+                "TTL": `${d['TEMPAT LAHIR'] || '-'}, ${d['TANGGAL LAHIR'] || '-'}`,
+                "Ayah": d['BIN'] || "-",
+                "Ibu": d['BINTI'] || "-"
+            };
+
+            let total = 0;
+            
+            // Loop urutan mapel sesuai dengan tabel SKL
+            scoreKeys.forEach(k => {
+                let valAngka = parseFloat((d[k] || "0").replace(',', '.'));
+                let headerTerbilang = mapTerbilang[k];
+                
+                // Menyusun kolom: Nilai Angka disusul Nilai Terbilang langsung dari CSV
+                row[`${k} (Angka)`] = valAngka;
+                row[`${k} (Terbilang)`] = d[headerTerbilang] || "-"; 
+                
+                total += valAngka;
+            });
+
+            // Kalkulasi Total dan Rata-rata di bagian paling belakang
+            row["Total"] = total;
+            row["Rata-rata"] = parseFloat((total / scoreKeys.length).toFixed(2));
+            
+            return row;
+        });
+
+        // Proses pembuatan file .xlsx dengan SheetJS
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Raport");
+        
+        // Sesuaikan lebar kolom agar rapi saat dibuka di Excel
+        const wscols = [
+            {wch: 5}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 30}, {wch: 25}, {wch: 20}, {wch: 20}
+        ];
+        worksheet['!cols'] = wscols;
+
+        // Picu unduhan
+        XLSX.writeFile(workbook, namaFile);
     }
 </script>
 </body>
