@@ -330,8 +330,8 @@
                 let valAngka = parseFloat((d[k] || "0").replace(',', '.'));
                 let headerTerbilang = mapTerbilang[k];
                 
-                row[`${k} (Angka)`] = valAngka;
-                row[`${k} (Terbilang)`] = d[headerTerbilang] || "-"; 
+                row[`${k}`] = valAngka;
+                row[`${k}`] = d[headerTerbilang] || "-"; 
                 
                 total += valAngka;
             });
